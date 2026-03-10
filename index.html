@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA PRO - DATABASE FINAL</title>
+    <style>
+        :root { --bg: #050505; --card: #111; --neon: #00ff87; --danger: #ff4444; --text: #fff; --dim: #888; --blue: #00d4ff; --gold: #ffd700; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 1400px; }
+        header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--neon); padding-bottom: 10px; cursor: pointer; }
+        #adminPanel { display: none; background: #161616; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--neon); }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn { padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; border: none; text-transform: uppercase; font-size: 0.8rem; flex: 1; }
+        .btn-green { background: var(--neon); color: #000; height: 45px; width: 100%; margin-top: 10px; }
+        .row-edit { display: grid; grid-template-columns: 2fr repeat(6, 1fr) 40px; gap: 5px; margin-bottom: 5px; }
+        input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; text-align: center; width: 100%; }
+        .table-wrap { background: var(--card); border-radius: 12px; padding: 15px; overflow-x: auto; border: 1px solid #222; }
+        table { width: 100%; border-collapse: collapse; min-width: 1250px; }
+        th { text-align: center; color: var(--dim); font-size: 0.7rem; padding: 12px; border-bottom: 2px solid #222; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #1a1a1a; text-align: center; }
+        .text-left { text-align: left; }
+        .col-pts { color: var(--neon); font-weight: 900; font-size: 1.1rem; }
+        .col-forca { color: var(--gold); font-weight: 900; }
+        .badge { background: rgba(255, 215, 0, 0.1); color: var(--gold); padding: 3px 8px; border-radius: 5px; border: 1px solid var(--gold); font-size: 0.7rem; }
+        select { background:#000; color:var(--neon); border:1px solid var(--neon); padding:10px; border-radius:5px; margin-bottom:20px; font-weight:bold; width: 100%; max-width: 400px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header onclick="solicitarAcesso()">
+        <h1>FIFA <span style="color:var(--neon)">DATABASE</span></h1>
+        <p style="color:var(--dim); font-size: 0.7rem;">GF +3,5 | GS -2,5 | SISTEMA DE BACKUP INTEGRADO</p>
+    </header>
+
+    <div id="adminPanel">
+        <div class="btn-group">
+            <button class="btn" style="background:#0066ff; color:white;" onclick="exportar()">📥 FAZER BACKUP (SALVAR ARQUIVO)</button>
+            <button class="btn" style="background:#ff9900; color:white;" onclick="importar()">📤 RESTAURAR (ABRIR ARQUIVO)</button>
+        </div>
+        <div id="editor"></div>
+        <button onclick="addPlayer()" style="background:none; border:1px dashed #444; color:#666; width:100%; padding:8px; margin-top:10px; cursor:pointer;">+ ADICIONAR JOGADOR</button>
+        <button class="btn btn-green" onclick="salvar()">💾 SALVAR DADOS NO NAVEGADOR</button>
+        <button class="btn" style="background:#400; color:#f66; margin-top:10px; width:100%" onclick="encerrarTemporada()">🔒 FINALIZAR ÉPOCA ATUAL</button>
+        <button class="btn" onclick="bloquearPainel()" style="background:#333; color:#fff; width:100%; margin-top:5px;">SAIR DO MODO EDITOR</button>
+    </div>
+
+    <div class="table-wrap">
+        <div style="text-align:center;">
+            <select id="viewSelect" onchange="mudarView(this.value)"></select>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>POS</th>
+                    <th class="text-left">JOGADOR</th>
+                    <th>PTS</th>
+                    <th>J</th>
+                    <th>V</th>
+                    <th>E</th>
+                    <th>D</th>
+                    <th style="color:var(--blue)">GF</th>
+                    <th style="color:var(--danger)">GS</th>
+                    <th>SG</th>
+                    <th>% APROV.</th>
+                    <th class="col-forca">FORÇA</th>
+                    <th id="thExtra">EXTRA</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const MINHA_SENHA = '123'; 
+    let acessoAutorizado = false;
+    const KEY = 'fifa_database_ultra_v25';
+    let db = JSON.parse(localStorage.getItem(KEY)) || { atual: [], historico: [] };
+    let modo = 'atual';
+
+    function solicitarAcesso() {
+        const pass = prompt("Acesso de Organizador:");
+        if(pass === MINHA_SENHA) { acessoAutorizado = true; document.getElementById('adminPanel').style.display = 'block'; render(); }
+    }
+
+    function bloquearPainel() { acessoAutorizado = false; document.getElementById('adminPanel').style.display = 'none'; }
+    function mudarView(v) { modo = v; render(); }
+
+    function atualizarMenu() {
+        const select = document.getElementById("viewSelect");
+        select.innerHTML = '<option value="atual">Temporada Atual</option><option value="geral">Ranking Geral</option>';
+        db.historico.forEach((temp, i) => { select.innerHTML += `<option value="${i}">Época: ${temp.nome}</option>`; });
+        select.value = modo;
+    }
+
+    function render() {
+        atualizarMenu();
+        const tbody = document.getElementById("tbody");
+        const thExtra = document.getElementById("thExtra");
+
+        let lista = (modo === 'atual') ? [...db.atual] : (modo === 'geral' ? processarGeral() : [...db.historico[modo].dados]);
+
+        lista.sort((a,b) => {
+            let pA = (a.v*3)+a.e, pB = (b.v*3)+b.e;
+            return pB - pA || b.v - a.v || (b.gp-b.gc) - (a.gp-a.gc);
+        });
+
+        tbody.innerHTML = lista.map((j, i) => {
+            let pts = (j.v*3)+j.e; 
+            let jogos = j.v+j.e+j.d;
+            let sg = j.gp - j.gc;
+            let perc = jogos > 0 ? ((pts / (jogos * 3)) * 100).toFixed(0) : 0;
+            let forcaVal = (modo === 'geral') ? (j.forcaAcumulada || 0) : ((j.gp * 3.5) - (j.gc * 2.5));
+
+            let extra = (modo === 'atual') ? (i < 1 ? "🏆 Líder" : i < 4 ? "🟢 G4" : "⚪ ---") : 
+                        (modo === 'geral' ? `<span class="badge">🏆 ${j.titulos} / 🎮 ${j.participacoes}</span>` : `<b>${i+1}º Lugar</b>`);
+
+            return `<tr>
+                <td>${i+1}º</td>
+                <td class="text-left"><b>${j.nome}</b></td>
+                <td class="col-pts">${pts}</td>
+                <td>${jogos}</td>
+                <td>${j.v}</td>
+                <td>${j.e}</td>
+                <td>${j.d}</td>
+                <td style="color:var(--blue)">${j.gp}</td>
+                <td style="color:var(--danger)">${j.gc}</td>
+                <td style="color:${sg>=0?'var(--blue)':'var(--danger)'}">${sg}</td>
+                <td>${perc}%</td>
+                <td class="col-forca">${forcaVal.toFixed(modo === 'geral' ? 0 : 1)}</td>
+                <td>${extra}</td>
+            </tr>`;
+        }).join('');
+
+        if(acessoAutorizado) renderEditor();
+    }
+
+    function processarGeral() {
+        let res = {};
+        db.historico.forEach(temp => {
+            temp.dados.forEach((j, index) => {
+                if(!res[j.nome]) res[j.nome] = {nome:j.nome, v:0, e:0, d:0, gp:0, gc:0, forcaAcumulada:0, titulos:0, participacoes:0};
+                res[j.nome].v += j.v; res[j.nome].e += j.e; res[j.nome].d += j.d;
+                res[j.nome].gp += j.gp; res[j.nome].gc += j.gc;
+                res[j.nome].participacoes += 1;
+                if(index === 0) { res[j.nome].forcaAcumulada += 25; res[j.nome].titulos += 1; }
+                else if(index === 1) res[j.nome].forcaAcumulada += 20;
+                else if(index === 2) res[j.nome].forcaAcumulada += 15;
+                else if(index === 3) res[j.nome].forcaAcumulada += 10;
+                else if(index === 4) res[j.nome].forcaAcumulada += 5;
+            });
+        });
+        db.atual.forEach(j => {
+            if(res[j.nome]) {
+                res[j.nome].v += j.v; res[j.nome].e += j.e; res[j.nome].d += j.d;
+                res[j.nome].gp += j.gp; res[j.nome].gc += j.gc;
+            }
+        });
+        return Object.values(res);
+    }
+
+    function renderEditor() {
+        document.getElementById('editor').innerHTML = db.atual.map((j,i) => `
+            <div class="row-edit">
+                <input type="text" value="${j.nome}" onchange="db.atual[${i}].nome=this.value">
+                <input type="number" value="${j.v}" onchange="db.atual[${i}].v=parseInt(this.value)">
+                <input type="number" value="${j.e}" onchange="db.atual[${i}].e=parseInt(this.value)">
+                <input type="number" value="${j.d}" onchange="db.atual[${i}].d=parseInt(this.value)">
+                <input type="number" value="${j.gp}" onchange="db.atual[${i}].gp=parseInt(this.value)">
+                <input type="number" value="${j.gc}" onchange="db.atual[${i}].gc=parseInt(this.value)">
+                <button onclick="db.atual.splice(${i},1); salvar();" style="color:red; background:none; border:none; cursor:pointer">✖</button>
+            </div>
+        `).join('');
+    }
+
+    function encerrarTemporada() {
+        if(!acessoAutorizado || db.atual.length === 0) return;
+        let nome = prompt("Nome da Época:");
+        if(nome) {
+            db.atual.sort((a,b) => ((b.v*3)+b.e) - ((a.v*3)+a.e) || b.v - a.v || (b.gp-b.gc) - (a.gp-a.gc));
+            db.historico.push({ nome: nome, dados: JSON.parse(JSON.stringify(db.atual)) });
+            db.atual = db.atual.map(j => ({ ...j, v:0, e:0, d:0, gp:0, gc:0 }));
+            salvar();
+        }
+    }
+
+    function addPlayer() { if(!acessoAutorizado) return; db.atual.push({nome:"Jogador", v:0, e:0, d:0, gp:0, gc:0}); render(); }
+    function salvar() { if(!acessoAutorizado) return; localStorage.setItem(KEY, JSON.stringify(db)); render(); }
+    
+    function exportar() {
+        const data = localStorage.getItem(KEY);
+        const blob = new Blob([data], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `backup_fifa_${new Date().toLocaleDateString()}.json`;
+        a.click();
+    }
+
+    function importar() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = e => {
+            const reader = new FileReader();
+            reader.readAsText(e.target.files[0]);
+            reader.onload = ev => {
+                localStorage.setItem(KEY, ev.target.result);
+                location.reload();
+            };
+        };
+        input.click();
+    }
+
+    render();
+</script>
+</body>
+</html>
