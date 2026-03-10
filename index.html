@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIFA PRO - DATABASE FINAL</title>
+    <title>FIFA DATABASE - Sistema de Força Global</title>
     <style>
         :root { --bg: #050505; --card: #111; --neon: #00ff87; --danger: #ff4444; --text: #fff; --dim: #888; --blue: #00d4ff; --gold: #ffd700; }
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -21,9 +21,9 @@
         td { padding: 12px; border-bottom: 1px solid #1a1a1a; text-align: center; }
         .text-left { text-align: left; }
         .col-pts { color: var(--neon); font-weight: 900; font-size: 1.1rem; }
-        .col-forca { color: var(--gold); font-weight: 900; }
+        .col-forca { color: var(--gold); font-weight: 900; font-size: 1.1rem; }
         .badge { background: rgba(255, 215, 0, 0.1); color: var(--gold); padding: 3px 8px; border-radius: 5px; border: 1px solid var(--gold); font-size: 0.7rem; }
-        select { background:#000; color:var(--neon); border:1px solid var(--neon); padding:10px; border-radius:5px; margin-bottom:20px; font-weight:bold; width: 100%; max-width: 400px; }
+        select { background:#000; color:var(--neon); border:1px solid var(--neon); padding:10px; border-radius:5px; margin-bottom:20px; font-weight:bold; width: 100%; max-width: 400px; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -31,19 +31,19 @@
 <div class="container">
     <header onclick="solicitarAcesso()">
         <h1>FIFA <span style="color:var(--neon)">DATABASE</span></h1>
-        <p style="color:var(--dim); font-size: 0.7rem;">GF +3,5 | GS -2,5 | SISTEMA DE BACKUP INTEGRADO</p>
+        <p style="color:var(--dim); font-size: 0.7rem;">FORÇA ACUMULADA: (GF*3.5 - GS*2.5) + PRESTÍGIO</p>
     </header>
 
     <div id="adminPanel">
         <div class="btn-group">
-            <button class="btn" style="background:#0066ff; color:white;" onclick="exportar()">📥 FAZER BACKUP (SALVAR ARQUIVO)</button>
-            <button class="btn" style="background:#ff9900; color:white;" onclick="importar()">📤 RESTAURAR (ABRIR ARQUIVO)</button>
+            <button class="btn" style="background:#0066ff; color:white;" onclick="exportar()">📥 BACKUP</button>
+            <button class="btn" style="background:#ff9900; color:white;" onclick="importar()">📤 RESTAURAR</button>
         </div>
         <div id="editor"></div>
-        <button onclick="addPlayer()" style="background:none; border:1px dashed #444; color:#666; width:100%; padding:8px; margin-top:10px; cursor:pointer;">+ ADICIONAR JOGADOR</button>
-        <button class="btn btn-green" onclick="salvar()">💾 SALVAR DADOS NO NAVEGADOR</button>
-        <button class="btn" style="background:#400; color:#f66; margin-top:10px; width:100%" onclick="encerrarTemporada()">🔒 FINALIZAR ÉPOCA ATUAL</button>
-        <button class="btn" onclick="bloquearPainel()" style="background:#333; color:#fff; width:100%; margin-top:5px;">SAIR DO MODO EDITOR</button>
+        <button onclick="addPlayer()" style="background:none; border:1px dashed #444; color:#666; width:100%; padding:8px; margin-top:10px; cursor:pointer;">+ JOGADOR</button>
+        <button class="btn btn-green" onclick="salvar()">💾 SALVAR DADOS</button>
+        <button class="btn" style="background:#400; color:#f66; margin-top:10px; width:100%" onclick="encerrarTemporada()">🔒 FINALIZAR TEMPORADA</button>
+        <button class="btn" onclick="bloquearPainel()" style="background:#333; color:#fff; width:100%; margin-top:5px;">SAIR</button>
     </div>
 
     <div class="table-wrap">
@@ -63,7 +63,7 @@
                     <th style="color:var(--blue)">GF</th>
                     <th style="color:var(--danger)">GS</th>
                     <th>SG</th>
-                    <th>% APROV.</th>
+                    <th>%</th>
                     <th class="col-forca">FORÇA</th>
                     <th id="thExtra">EXTRA</th>
                 </tr>
@@ -76,12 +76,12 @@
 <script>
     const MINHA_SENHA = '123'; 
     let acessoAutorizado = false;
-    const KEY = 'fifa_database_ultra_v25';
+    const KEY = 'fifa_database_ultimate_v30';
     let db = JSON.parse(localStorage.getItem(KEY)) || { atual: [], historico: [] };
     let modo = 'atual';
 
     function solicitarAcesso() {
-        const pass = prompt("Acesso de Organizador:");
+        const pass = prompt("Senha:");
         if(pass === MINHA_SENHA) { acessoAutorizado = true; document.getElementById('adminPanel').style.display = 'block'; render(); }
     }
 
@@ -90,29 +90,30 @@
 
     function atualizarMenu() {
         const select = document.getElementById("viewSelect");
-        select.innerHTML = '<option value="atual">Temporada Atual</option><option value="geral">Ranking Geral</option>';
+        select.innerHTML = '<option value="atual">Temporada Atual</option><option value="geral">Ranking Geral (Soma de Tudo)</option>';
         db.historico.forEach((temp, i) => { select.innerHTML += `<option value="${i}">Época: ${temp.nome}</option>`; });
         select.value = modo;
     }
 
+    const calcForcaGolos = (gp, gc) => (gp * 3.5) - (gc * 2.5);
+
     function render() {
         atualizarMenu();
         const tbody = document.getElementById("tbody");
-        const thExtra = document.getElementById("thExtra");
-
         let lista = (modo === 'atual') ? [...db.atual] : (modo === 'geral' ? processarGeral() : [...db.historico[modo].dados]);
 
         lista.sort((a,b) => {
             let pA = (a.v*3)+a.e, pB = (b.v*3)+b.e;
-            return pB - pA || b.v - a.v || (b.gp-b.gc) - (a.gp-a.gc);
+            let fA = (modo === 'geral') ? a.forcaAcumulada : calcForcaGolos(a.gp, a.gc);
+            let fB = (modo === 'geral') ? b.forcaAcumulada : calcForcaGolos(b.gp, b.gc);
+            return pB - pA || b.v - a.v || (b.gp-b.gc) - (a.gp-a.gc) || fB - fA;
         });
 
         tbody.innerHTML = lista.map((j, i) => {
             let pts = (j.v*3)+j.e; 
             let jogos = j.v+j.e+j.d;
             let sg = j.gp - j.gc;
-            let perc = jogos > 0 ? ((pts / (jogos * 3)) * 100).toFixed(0) : 0;
-            let forcaVal = (modo === 'geral') ? (j.forcaAcumulada || 0) : ((j.gp * 3.5) - (j.gc * 2.5));
+            let forcaExibida = (modo === 'geral') ? j.forcaAcumulada : calcForcaGolos(j.gp, j.gc);
 
             let extra = (modo === 'atual') ? (i < 1 ? "🏆 Líder" : i < 4 ? "🟢 G4" : "⚪ ---") : 
                         (modo === 'geral' ? `<span class="badge">🏆 ${j.titulos} / 🎮 ${j.participacoes}</span>` : `<b>${i+1}º Lugar</b>`);
@@ -128,8 +129,8 @@
                 <td style="color:var(--blue)">${j.gp}</td>
                 <td style="color:var(--danger)">${j.gc}</td>
                 <td style="color:${sg>=0?'var(--blue)':'var(--danger)'}">${sg}</td>
-                <td>${perc}%</td>
-                <td class="col-forca">${forcaVal.toFixed(modo === 'geral' ? 0 : 1)}</td>
+                <td>${jogos > 0 ? ((pts/(jogos*3))*100).toFixed(0) : 0}%</td>
+                <td class="col-forca">${forcaExibida.toFixed(1)}</td>
                 <td>${extra}</td>
             </tr>`;
         }).join('');
@@ -139,12 +140,15 @@
 
     function processarGeral() {
         let res = {};
+        // 1. Somar tudo do Histórico
         db.historico.forEach(temp => {
             temp.dados.forEach((j, index) => {
                 if(!res[j.nome]) res[j.nome] = {nome:j.nome, v:0, e:0, d:0, gp:0, gc:0, forcaAcumulada:0, titulos:0, participacoes:0};
                 res[j.nome].v += j.v; res[j.nome].e += j.e; res[j.nome].d += j.d;
                 res[j.nome].gp += j.gp; res[j.nome].gc += j.gc;
                 res[j.nome].participacoes += 1;
+                res[j.nome].forcaAcumulada += calcForcaGolos(j.gp, j.gc);
+                // Prestígio por posição
                 if(index === 0) { res[j.nome].forcaAcumulada += 25; res[j.nome].titulos += 1; }
                 else if(index === 1) res[j.nome].forcaAcumulada += 20;
                 else if(index === 2) res[j.nome].forcaAcumulada += 15;
@@ -152,11 +156,12 @@
                 else if(index === 4) res[j.nome].forcaAcumulada += 5;
             });
         });
+        // 2. Somar a Temporada Atual
         db.atual.forEach(j => {
-            if(res[j.nome]) {
-                res[j.nome].v += j.v; res[j.nome].e += j.e; res[j.nome].d += j.d;
-                res[j.nome].gp += j.gp; res[j.nome].gc += j.gc;
-            }
+            if(!res[j.nome]) res[j.nome] = {nome:j.nome, v:0, e:0, d:0, gp:0, gc:0, forcaAcumulada:0, titulos:0, participacoes:0};
+            res[j.nome].v += j.v; res[j.nome].e += j.e; res[j.nome].d += j.d;
+            res[j.nome].gp += j.gp; res[j.nome].gc += j.gc;
+            res[j.nome].forcaAcumulada += calcForcaGolos(j.gp, j.gc);
         });
         return Object.values(res);
     }
@@ -186,31 +191,10 @@
         }
     }
 
-    function addPlayer() { if(!acessoAutorizado) return; db.atual.push({nome:"Jogador", v:0, e:0, d:0, gp:0, gc:0}); render(); }
+    function addPlayer() { if(!acessoAutorizado) return; db.atual.push({nome:"Novo", v:0, e:0, d:0, gp:0, gc:0}); render(); }
     function salvar() { if(!acessoAutorizado) return; localStorage.setItem(KEY, JSON.stringify(db)); render(); }
-    
-    function exportar() {
-        const data = localStorage.getItem(KEY);
-        const blob = new Blob([data], {type: 'application/json'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `backup_fifa_${new Date().toLocaleDateString()}.json`;
-        a.click();
-    }
-
-    function importar() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.onchange = e => {
-            const reader = new FileReader();
-            reader.readAsText(e.target.files[0]);
-            reader.onload = ev => {
-                localStorage.setItem(KEY, ev.target.result);
-                location.reload();
-            };
-        };
-        input.click();
-    }
+    function exportar() { const data = localStorage.getItem(KEY); const blob = new Blob([data], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `backup_fifa.json`; a.click(); }
+    function importar() { const input = document.createElement('input'); input.type = 'file'; input.onchange = e => { const reader = new FileReader(); reader.readAsText(e.target.files[0]); reader.onload = ev => { localStorage.setItem(KEY, ev.target.result); location.reload(); }; }; input.click(); }
 
     render();
 </script>
